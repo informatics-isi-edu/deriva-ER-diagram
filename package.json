@@ -1,0 +1,12 @@
+{
+  "name": "deriva-er-diagram",
+  "version": "0.0.1",
+  "description": "",
+  "main": "src/index.js",
+  "type": "module",
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@dbml/core": "^5.0.0"
+  }
+}

@@ -1,0 +1,15 @@
+*~
+*.swp
+.DS_Store*
+.project
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.idea
+.vscode
+
+node_modules
+*.sql
+*.dbml
