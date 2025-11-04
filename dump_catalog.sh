@@ -39,6 +39,11 @@ eval "sudo -u ermrest pg_dump -d \"${DBNAME}\" -s -F p -E UTF-8 \
   --exclude-schema='pg_toast*' \
   --exclude-schema='pg_temp*' \
   --exclude-schema='public' \
+  --no-comments \
+  --no-owner \
+  --no-acl \
+  --no-publications \
+  --disable-dollar-quoting \
   ${SCHEMA_ARGS} \
   -f \"${TEMP_FILE}\""
 
@@ -47,29 +52,36 @@ if [ -f "${TEMP_FILE}" ]; then
     # Create filtered version excluding function definitions and cross-schema FKs
     FILTERED_FILE="/tmp/filtered_$$_$(date +%s).sql"
     
-    # Apply different filtering based on whether schemas were specified
+    # Schemas to exclude from FK references. Always exclude public.
+    EXCLUDED_FK_SCHEMAS=("public")
+
     if [ ${#SCHEMAS[@]} -gt 0 ]; then
+        # If specific schemas are given, we also need to find which other schemas are in the dump
+        # to exclude FKs to them.
+
         # Build regex pattern for included schemas
-        SCHEMA_PATTERN=""
-        for i in "${!SCHEMAS[@]}"; do
-            if [ $i -eq 0 ]; then
-                SCHEMA_PATTERN="${SCHEMAS[i]}"
-            else
-                SCHEMA_PATTERN="${SCHEMA_PATTERN}\|${SCHEMAS[i]}"
-            fi
-        done
+        SCHEMA_PATTERN=$(IFS=\|; echo "${SCHEMAS[*]}")
         
-        # Remove CREATE FUNCTION blocks
-        sed '/^CREATE FUNCTION/,/^[[:space:]]*\$[^$]*\$[[:space:]]*;[[:space:]]*$/d; /^CREATE OR REPLACE FUNCTION/,/^[[:space:]]*\$[^$]*\$[[:space:]]*;[[:space:]]*$/d' "${TEMP_FILE}" | \
-        # Remove public schema foreign keys (both ALTER TABLE and ADD CONSTRAINT lines)
-        sed '/^ALTER TABLE.*$/N; /ADD CONSTRAINT.*REFERENCES public\./d' | \
-        # Remove foreign keys to any schema not in our included list (both ALTER TABLE and ADD CONSTRAINT lines)
-        sed "/^ALTER TABLE.*$/N; /ADD CONSTRAINT.*REFERENCES \(${SCHEMA_PATTERN}\)\./!{/ADD CONSTRAINT.*REFERENCES /d;}" > "${FILTERED_FILE}"
+        # Filter out functions and FKs
+        sed -e '/^--/d' \
+            -e '/^CREATE INDEX/,/;/d' \
+            -e '/^CREATE TRIGGER/,/;/d' \
+            -e '/^[[:space:]]*$/d' \
+            -e '/^CREATE OR REPLACE FUNCTION/,/^[[:space:]]*\$[^$]*\$[[:space:]]*;[[:space:]]*$/d' \
+            -e '/^CREATE FUNCTION/,/^[[:space:]]*\$[^$]*\$[[:space:]]*;[[:space:]]*$/d' \
+            -e '/^ALTER TABLE.*$/N; /ADD CONSTRAINT.*REFERENCES public\./d' \
+            -e "/^ALTER TABLE.*$/N; /ADD CONSTRAINT.*REFERENCES \(${SCHEMA_PATTERN}\)\./!{/ADD CONSTRAINT.*REFERENCES /d;}" \
+            "${TEMP_FILE}" > "${FILTERED_FILE}"
     else
-        # No specific schemas requested, so only remove functions and public schema FKs
-        sed '/^CREATE FUNCTION/,/^[[:space:]]*\$[^$]*\$[[:space:]]*;[[:space:]]*$/d; /^CREATE OR REPLACE FUNCTION/,/^[[:space:]]*\$[^$]*\$[[:space:]]*;[[:space:]]*$/d' "${TEMP_FILE}" | \
-        # Remove public schema foreign keys (both ALTER TABLE and ADD CONSTRAINT lines)
-        sed '/^ALTER TABLE.*$/N; /ADD CONSTRAINT.*REFERENCES public\./d' > "${FILTERED_FILE}"
+        # No specific schemas, just remove functions and public FKs
+        sed -e '/^--/d' \
+            -e '/^CREATE INDEX/,/;/d' \
+            -e '/^CREATE TRIGGER/,/;/d' \
+            -e '/^[[:space:]]*$/d' \
+            -e '/^CREATE OR REPLACE FUNCTION/,/^[[:space:]]*\$[^$]*\$[[:space:]]*;[[:space:]]*$/d' \
+            -e '/^CREATE FUNCTION/,/^[[:space:]]*\$[^$]*\$[[:space:]]*;[[:space:]]*$/d' \
+            -e '/^ALTER TABLE.*$/N; /ADD CONSTRAINT.*REFERENCES public\./d' \
+            "${TEMP_FILE}" > "${FILTERED_FILE}"
     fi
     
     # Move the filtered file to the desired location

@@ -28,4 +28,4 @@ node src/index.js _ermrest_catalog_3 bio
 node src/index.js _ermrest_catalog_3 bio,vocab
 ```
 
-4. Copy the content of `output.dbml` to `https://dbdiagram.io/d`
+4. Copy the content of `output.dbml` to `https://dbdiagram.io/d` (change the layout to "snowflake" for a more readable version)
