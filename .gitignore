@@ -9,7 +9,12 @@ ehthumbs.db
 Thumbs.db
 .idea
 .vscode
+.zed
 
-node_modules
-*.sql
-*.dbml
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+*.egg-info/
+.ruff_cache/
